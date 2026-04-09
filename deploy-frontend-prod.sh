@@ -3,11 +3,10 @@ set -e
 
 # Load environment variables
 if [ -f "$(dirname "$0")/.env" ]; then
-  export $(grep -v '^#' "$(dirname "$0")/.env" | xargs)
+  set -a; source "$(dirname "$0")/.env"; set +a
 fi
 
-export NVM_DIR="/home/ops/.nvm"
-source "$NVM_DIR/nvm.sh"
+source "$NVM_PATH"
 nvm use 22
 
 cd "$FRONTEND_PROD_PATH"

@@ -27,7 +27,9 @@ function log(level, category, message, meta = {}) {
   else console.log(line);
 
   // Persistent deploy log
-  fs.appendFileSync(path.join(LOG_DIR, "deploy.log"), line + "\n");
+  fs.appendFile(path.join(LOG_DIR, "deploy.log"), line + "\n", (err) => {
+    if (err) console.error(`Failed to write to deploy.log: ${err.message}`);
+  });
 }
 
 // ── Security ────────────────────────────────────────────────────────────────
@@ -93,6 +95,7 @@ function runDeploy(script, req, res) {
 // ── Routes ──────────────────────────────────────────────────────────────────
 
 const app = express();
+app.set("trust proxy", true);
 
 app.post("/frontend-webhook", signedJson, (req, res) => {
   const event = req.headers["x-github-event"];
