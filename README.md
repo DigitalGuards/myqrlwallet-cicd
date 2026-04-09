@@ -1,4 +1,4 @@
-# ZondWebWallet CI/CD Server
+# MyQRLWallet CI/CD Server
 
 A Node.js-based continuous integration and continuous deployment (CI/CD) server that handles GitHub webhooks to automatically deploy frontend and backend applications to development and production environments.
 
@@ -24,8 +24,8 @@ A Node.js-based continuous integration and continuous deployment (CI/CD) server 
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/DigitalGuards/theqrlwallet-auto-deploy.git
-cd theqrlwallet-auto-deploy
+git clone https://github.com/DigitalGuards/myqrlwallet-cicd.git
+cd myqrlwallet-cicd
 ```
 
 2. Install dependencies:
