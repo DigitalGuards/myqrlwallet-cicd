@@ -1,14 +1,16 @@
 #!/bin/bash
+set -e
 
 # Load environment variables
-if [ -f .env ]; then
-  export $(grep -v '^#' .env | xargs)
+if [ -f "$(dirname "$0")/.env" ]; then
+  export $(grep -v '^#' "$(dirname "$0")/.env" | xargs)
 fi
 
-cd "$FRONTEND_PROD_PATH"
+export NVM_DIR="/home/ops/.nvm"
+source "$NVM_DIR/nvm.sh"
+nvm use 22
 
-source "$NVM_PATH"
-nvm use --lts
+cd "$FRONTEND_PROD_PATH"
 
 echo "Pulling latest changes..."
 git pull origin main
@@ -19,7 +21,7 @@ npm install
 echo "Building..."
 npm run build
 
-echo "Copying files to server..."
+echo "Copying files to webroot..."
 sudo cp -rf dist/* "$FRONTEND_DEPLOYED_PROD_PATH"
 
-echo "Done"
+echo "Frontend production deployment complete"
