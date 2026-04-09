@@ -1,92 +1,139 @@
 const express = require("express");
 const crypto = require("crypto");
-const { exec } = require("child_process");
+const { execFile } = require("child_process");
+const path = require("path");
+const fs = require("fs");
 
 require("dotenv").config();
 
-const app = express();
-const PORT = process.env.PORT;
+const PORT = process.env.PORT || 3001;
 const SECRET = process.env.SECRET;
+const LOG_DIR = path.join(__dirname, "logs");
 
-app.use(express.json());
+if (!fs.existsSync(LOG_DIR)) fs.mkdirSync(LOG_DIR);
 
-function verifySignature(req, res, buf) {
-    const signature = req.headers["x-hub-signature-256"];
-    if (!signature) {
-        return res.status(401).send("Signature missing");
-    }
-    const hmac = crypto.createHmac("sha256", SECRET);
-    hmac.update(buf);
-    const digest = `sha256=${hmac.digest("hex")}`;
-    if (signature !== digest) {
-        return res.status(401).send("Invalid signature");
-    }
+// ── Logging ─────────────────────────────────────────────────────────────────
+
+function timestamp() {
+  return new Date().toISOString();
 }
 
-app.post("/frontend-webhook", express.json({ verify: verifySignature }), (req, res) => {
-    const event = req.headers["x-github-event"];
-    const payload = req.body;
+function log(level, category, message, meta = {}) {
+  const entry = { time: timestamp(), level, category, message, ...meta };
+  const line = JSON.stringify(entry);
 
-    console.log(`Received event: ${event}`);
+  // stdout for PM2
+  if (level === "error") console.error(line);
+  else console.log(line);
 
-    if (event === "push" && payload.ref === "refs/heads/main") {
-        console.log("Code pushed to main branch. Triggering deployment...");
+  // Persistent deploy log
+  fs.appendFile(path.join(LOG_DIR, "deploy.log"), line + "\n", (err) => {
+    if (err) console.error(`Failed to write to deploy.log: ${err.message}`);
+  });
+}
 
-        exec("./deploy-frontend-prod.sh", (err, stdout, stderr) => {
-            if (err) {
-                console.error(`Error executing deployment: ${err}`);
-                return res.status(500).send("Deployment failed");
-            }
-            console.log(`Deployment output:\n${stdout}`);
-            res.send("Deployment successful");
-        });
-    } else if (event === "push" && payload.ref === "refs/heads/dev") {
-        console.log("Code pushed to dev branch. Triggering deployment...");
-        exec("./deploy-frontend-dev.sh", (err, stdout, stderr) => {
-            if (err) {
-                console.error(`Error executing deployment: ${err}`);
-                return res.status(500).send("Deployment failed");
-            }
-            console.log(`Deployment output:\n${stdout}`);
-            res.send("Deployment successful");
-        });
-    } else {
-        res.send("Event received, but no action taken.");
-    }
+// ── Security ────────────────────────────────────────────────────────────────
+
+function verifySignature(req, res, buf) {
+  const signature = req.headers["x-hub-signature-256"];
+  if (!signature) {
+    throw new Error("Signature missing");
+  }
+
+  const expected = `sha256=${crypto.createHmac("sha256", SECRET).update(buf).digest("hex")}`;
+
+  // timingSafeEqual throws on length mismatch — guard against it
+  if (
+    signature.length !== expected.length ||
+    !crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))
+  ) {
+    throw new Error("Invalid signature");
+  }
+}
+
+const signedJson = express.json({
+  verify: verifySignature,
+  limit: "1mb", // Cap payload size — GitHub push payloads are typically <100KB
 });
 
-app.post("/backend-webhook", express.json({ verify: verifySignature }), (req, res) => {
-    const event = req.headers["x-github-event"];
-    const payload = req.body;
+// ── Deploy lock ─────────────────────────────────────────────────────────────
 
-    console.log(`Received event: ${event}`);
+const activeDeploys = new Set();
 
-    if (event === "push" && payload.ref === "refs/heads/main") {
-        console.log("Code pushed to main branch. Triggering deployment...");
+function runDeploy(script, req, res) {
+  if (activeDeploys.has(script)) {
+    log("warn", "deploy", "Deploy already in progress, rejecting", { script });
+    return res.status(409).json({ error: "Deploy already in progress" });
+  }
 
-        exec("./deploy-backend-prod.sh", (err, stdout, stderr) => {
-            if (err) {
-                console.error(`Error executing deployment: ${err}`);
-                return res.status(500).send("Deployment failed");
-            }
-            console.log(`Deployment output:\n${stdout}`);
-            res.send("Deployment successful");
-        });
-    } else if (event === "push" && payload.ref === "refs/heads/dev") {
-        console.log("Code pushed to dev branch. Triggering deployment...");
-        exec("./deploy-backend-dev.sh", (err, stdout, stderr) => {
-            if (err) {
-                console.error(`Error executing deployment: ${err}`);
-                return res.status(500).send("Deployment failed");
-            }
-            console.log(`Deployment output:\n${stdout}`);
-            res.send("Deployment successful");
-        });
-    } else {
-        res.send("Event received, but no action taken.");
+  activeDeploys.add(script);
+  const startTime = Date.now();
+  const deliveryId = req.headers["x-github-delivery"] || "unknown";
+  const pusher = req.body?.pusher?.name || "unknown";
+  const headCommit = req.body?.head_commit?.id?.slice(0, 8) || "unknown";
+
+  log("info", "deploy", `Starting ${script}`, { deliveryId, pusher, headCommit });
+
+  // execFile avoids shell — no injection surface
+  execFile("bash", [path.join(__dirname, script)], { cwd: __dirname, timeout: 300000 }, (err, stdout, stderr) => {
+    const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+    activeDeploys.delete(script);
+
+    if (stdout) log("info", "deploy", stdout.trim(), { script });
+    if (stderr) log("warn", "deploy", stderr.trim(), { script });
+
+    if (err) {
+      log("error", "deploy", `${script} failed after ${duration}s`, { deliveryId, error: err.message });
+      return res.status(500).json({ error: "Deployment failed" });
     }
+
+    log("info", "deploy", `${script} completed in ${duration}s`, { deliveryId, pusher, headCommit });
+    res.json({ status: "ok", duration: `${duration}s` });
+  });
+}
+
+// ── Routes ──────────────────────────────────────────────────────────────────
+
+const app = express();
+app.set("trust proxy", true);
+
+app.post("/frontend-webhook", signedJson, (req, res) => {
+  const event = req.headers["x-github-event"];
+  const ref = req.body.ref;
+
+  if (event === "push" && ref === "refs/heads/main") {
+    return runDeploy("deploy-frontend-prod.sh", req, res);
+  }
+
+  log("info", "webhook", "Ignored event", { event, ref });
+  res.json({ status: "ignored" });
 });
 
-app.listen(PORT, () => {
-    console.log(`Webhook listener running on port ${PORT}`);
+app.post("/backend-webhook", signedJson, (req, res) => {
+  const event = req.headers["x-github-event"];
+  const ref = req.body.ref;
+
+  if (event === "push" && ref === "refs/heads/main") {
+    return runDeploy("deploy-backend-prod.sh", req, res);
+  }
+
+  log("info", "webhook", "Ignored event", { event, ref });
+  res.json({ status: "ignored" });
+});
+
+app.use((req, res) => {
+  res.status(404).json({ error: "Not found" });
+});
+
+app.use((err, req, res, next) => {
+  if (err.message === "Signature missing" || err.message === "Invalid signature") {
+    log("warn", "security", err.message, { ip: req.ip });
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  log("error", "server", "Unhandled error", { error: err.message });
+  res.status(500).json({ error: "Internal server error" });
+});
+
+app.listen(PORT, "127.0.0.1", () => {
+  log("info", "server", `Webhook listener running on 127.0.0.1:${PORT}`);
 });

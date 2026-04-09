@@ -1,14 +1,15 @@
 #!/bin/bash
+set -e
 
 # Load environment variables
-if [ -f .env ]; then
-  export $(grep -v '^#' .env | xargs)
+if [ -f "$(dirname "$0")/.env" ]; then
+  set -a; source "$(dirname "$0")/.env"; set +a
 fi
 
-cd "$BACKEND_PROD_PATH"
-
 source "$NVM_PATH"
-nvm use --lts
+nvm use 22
+
+cd "$BACKEND_PROD_PATH"
 
 echo "Pulling latest changes..."
 git pull origin main
@@ -17,6 +18,6 @@ echo "Installing dependencies..."
 npm install
 
 echo "Restarting server..."
-pm2 restart "$BACKEND_PROD_PM2_NAME"
+pm2 restart "$BACKEND_PROD_PM2_NAME" --update-env
 
-echo "Done"
+echo "Backend production deployment complete"
