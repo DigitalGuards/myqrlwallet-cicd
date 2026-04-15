@@ -11,8 +11,10 @@ nvm use 22
 
 cd "$FRONTEND_PROD_PATH"
 
-echo "Pulling latest changes..."
-git pull origin main
+echo "Resetting to latest main..."
+git fetch origin main
+git checkout main --force
+git reset --hard origin/main
 
 echo "Installing dependencies..."
 npm install

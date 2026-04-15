@@ -11,13 +11,16 @@ nvm use 22
 
 cd "$BACKEND_PROD_PATH"
 
-echo "Pulling latest changes..."
-git pull origin main
+echo "Resetting to latest main..."
+git fetch origin main
+git checkout main --force
+git reset --hard origin/main
 
 echo "Installing dependencies..."
 npm install
 
 echo "Restarting server..."
+unset PORT
 pm2 restart "$BACKEND_PROD_PM2_NAME" --update-env
 
 echo "Backend production deployment complete"
