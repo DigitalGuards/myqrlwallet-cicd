@@ -17,6 +17,9 @@ git pull origin main
 echo "Installing dependencies..."
 npm install
 
+echo "Building (TypeScript -> dist/)..."
+npm run build --if-present
+
 echo "Restarting server..."
 pm2 restart "$BACKEND_PROD_PM2_NAME" --update-env
 
