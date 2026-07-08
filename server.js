@@ -56,6 +56,39 @@ const signedJson = express.json({
   limit: "1mb", // Cap payload size — GitHub push payloads are typically <100KB
 });
 
+// ── Discord notifications ──────────────────────────────────────────────────
+
+const DISCORD_WEBHOOK = process.env.DISCORD_WEBHOOK;
+
+function notifyDiscord(script, { pusher, headCommit, duration, error }) {
+  if (!DISCORD_WEBHOOK) return;
+
+  const env = script.includes("-dev") ? "dev" : "prod";
+  const service = script.includes("frontend") ? "Frontend" : "Backend";
+  const success = !error;
+
+  const embed = {
+    title: `${success ? "\u2705" : "\u274C"} ${service} Deploy (${env})`,
+    color: success ? 0x2ecc71 : 0xe74c3c,
+    fields: [
+      { name: "Pusher", value: pusher, inline: true },
+      { name: "Commit", value: headCommit, inline: true },
+      { name: "Duration", value: duration, inline: true },
+    ],
+    timestamp: new Date().toISOString(),
+  };
+
+  if (error) {
+    embed.fields.push({ name: "Error", value: error.slice(0, 200) });
+  }
+
+  fetch(DISCORD_WEBHOOK, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ embeds: [embed] }),
+  }).catch((err) => log("error", "discord", `Failed to send notification: ${err.message}`));
+}
+
 // ── Deploy lock ─────────────────────────────────────────────────────────────
 
 const activeDeploys = new Set();
@@ -84,10 +117,12 @@ function runDeploy(script, req, res) {
 
     if (err) {
       log("error", "deploy", `${script} failed after ${duration}s`, { deliveryId, error: err.message });
+      notifyDiscord(script, { pusher, headCommit, duration: `${duration}s`, error: err.message });
       return res.status(500).json({ error: "Deployment failed" });
     }
 
     log("info", "deploy", `${script} completed in ${duration}s`, { deliveryId, pusher, headCommit });
+    notifyDiscord(script, { pusher, headCommit, duration: `${duration}s` });
     res.json({ status: "ok", duration: `${duration}s` });
   });
 }
@@ -105,6 +140,10 @@ app.post("/frontend-webhook", signedJson, (req, res) => {
     return runDeploy("deploy-frontend-prod.sh", req, res);
   }
 
+  if (event === "push" && ref === "refs/heads/dev") {
+    return runDeploy("deploy-frontend-dev.sh", req, res);
+  }
+
   log("info", "webhook", "Ignored event", { event, ref });
   res.json({ status: "ignored" });
 });
@@ -115,6 +154,10 @@ app.post("/backend-webhook", signedJson, (req, res) => {
 
   if (event === "push" && ref === "refs/heads/main") {
     return runDeploy("deploy-backend-prod.sh", req, res);
+  }
+
+  if (event === "push" && ref === "refs/heads/dev") {
+    return runDeploy("deploy-backend-dev.sh", req, res);
   }
 
   log("info", "webhook", "Ignored event", { event, ref });
