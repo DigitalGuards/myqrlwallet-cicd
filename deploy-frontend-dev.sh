@@ -9,12 +9,12 @@ fi
 source "$NVM_PATH"
 nvm use 22
 
-cd "$FRONTEND_PROD_PATH"
+cd "$FRONTEND_DEV_PATH"
 
-echo "Resetting to latest main..."
-git fetch origin main
-git checkout main --force
-git reset --hard origin/main
+echo "Resetting to latest dev..."
+git fetch origin dev
+git checkout dev --force
+git reset --hard origin/dev
 
 echo "Installing dependencies..."
 npm install
@@ -23,6 +23,6 @@ echo "Building..."
 npm run build
 
 echo "Copying files to webroot..."
-sudo cp -rf dist/* "$FRONTEND_DEPLOYED_PROD_PATH"
+sudo cp -rf dist/* "$FRONTEND_DEPLOYED_DEV_PATH"
 
-echo "Frontend production deployment complete"
+echo "Frontend dev deployment complete"
