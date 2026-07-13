@@ -23,6 +23,6 @@ echo "Building..."
 npm run build
 
 echo "Copying files to webroot..."
-sudo cp -rf dist/* "$FRONTEND_DEPLOYED_PROD_PATH"
+sudo cp -rf dist/. "$FRONTEND_DEPLOYED_PROD_PATH"
 
 echo "Frontend production deployment complete"
