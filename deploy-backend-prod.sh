@@ -26,4 +26,8 @@ echo "Restarting server..."
 unset PORT
 pm2 restart "$BACKEND_PROD_PM2_NAME" --update-env
 
+echo "Verifying the server booted..."
+source "$(dirname "$0")/post-deploy-check.sh"
+post_deploy_check "$BACKEND_PROD_PM2_NAME" "$BACKEND_PROD_PATH"
+
 echo "Backend production deployment complete"
