@@ -10,8 +10,9 @@ if [ -f "$SCRIPT_DIR/.env" ]; then
   set -a; source "$SCRIPT_DIR/.env"; set +a
 fi
 
-source "$NVM_PATH"
-nvm use 22
+source "$SCRIPT_DIR/use-dev-toolchain.sh"
+use_dev_toolchain
+command -v pm2 >/dev/null || { echo "PM2 is missing from the dev deploy PATH" >&2; exit 1; }
 
 cd "$BACKEND_DEV_PATH"
 
@@ -21,14 +22,18 @@ git checkout dev --force
 git reset --hard origin/dev
 
 echo "Installing dependencies..."
-npm install
+npm ci
 
 echo "Building (TypeScript -> dist/)..."
 npm run build --if-present
 
 echo "Restarting server..."
 unset PORT
-pm2 restart "$BACKEND_DEV_PM2_NAME" --update-env
+restart_args=(restart "$BACKEND_DEV_PM2_NAME" --update-env)
+if [ -n "${DEV_NODE_BIN:-}" ]; then
+  restart_args+=(--interpreter "$DEV_NODE_BIN/node")
+fi
+pm2 "${restart_args[@]}"
 
 echo "Verifying the server booted..."
 source "$SCRIPT_DIR/post-deploy-check.sh"
