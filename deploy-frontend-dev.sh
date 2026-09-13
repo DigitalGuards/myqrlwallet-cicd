@@ -1,13 +1,15 @@
 #!/bin/bash
 set -e
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 # Load environment variables
-if [ -f "$(dirname "$0")/.env" ]; then
-  set -a; source "$(dirname "$0")/.env"; set +a
+if [ -f "$SCRIPT_DIR/.env" ]; then
+  set -a; source "$SCRIPT_DIR/.env"; set +a
 fi
 
-source "$NVM_PATH"
-nvm use 22
+source "$SCRIPT_DIR/use-dev-toolchain.sh"
+use_dev_toolchain
 
 cd "$FRONTEND_DEV_PATH"
 
@@ -17,7 +19,7 @@ git checkout dev --force
 git reset --hard origin/dev
 
 echo "Installing dependencies..."
-npm install
+npm ci
 
 echo "Building..."
 npm run build
