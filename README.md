@@ -62,6 +62,16 @@ Both dev scripts use `npm ci`, so their applications must commit a matching
 lockfile. Validate the toolchain selector with
 `node --test use-dev-toolchain.test.mjs`.
 
+### Optional production Node runtime
+
+Set `PRODUCTION_NODE_BIN` to an absolute directory containing executable `node`
+and `npm` binaries to pin production builds and the backend PM2 interpreter.
+Production deployments use `npm ci` with the committed lockfile. An invalid
+override fails the deployment before changing the application checkout. With
+the override absent, production retains its existing NVM 22 selection.
+
+Validate both runtime selectors with `node --test use-*-toolchain.test.mjs`.
+
 1. Start the server:
 ```bash
 node server.js
