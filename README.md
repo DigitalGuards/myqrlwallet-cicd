@@ -50,6 +50,28 @@ BACKEND_DEV_PM2_NAME=backend-dev
 
 ## Usage
 
+### Optional dev-only Node runtime
+
+Set `DEV_NODE_BIN` to an absolute directory containing executable `node` and
+`npm` binaries to pin the two dev deployments to a separate Node installation.
+The backend dev restart also selects that installation as its PM2 interpreter.
+With this option absent, dev retains the existing NVM 22 selection. Production
+scripts and NVM defaults are unchanged. An invalid override fails the dev deploy.
+
+Both dev scripts use `npm ci`, so their applications must commit a matching
+lockfile. Validate the toolchain selector with
+`node --test use-dev-toolchain.test.mjs`.
+
+### Optional production Node runtime
+
+Set `PRODUCTION_NODE_BIN` to an absolute directory containing executable `node`
+and `npm` binaries to pin production builds and the backend PM2 interpreter.
+Production deployments use `npm ci` with the committed lockfile. An invalid
+override fails the deployment before changing the application checkout. With
+the override absent, production retains its existing NVM 22 selection.
+
+Validate both runtime selectors with `node --test use-*-toolchain.test.mjs`.
+
 1. Start the server:
 ```bash
 node server.js

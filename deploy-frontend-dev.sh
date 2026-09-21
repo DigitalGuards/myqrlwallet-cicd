@@ -8,15 +8,15 @@ if [ -f "$SCRIPT_DIR/.env" ]; then
   set -a; source "$SCRIPT_DIR/.env"; set +a
 fi
 
-source "$SCRIPT_DIR/use-prod-toolchain.sh"
-use_prod_toolchain
+source "$SCRIPT_DIR/use-dev-toolchain.sh"
+use_dev_toolchain
 
-cd "$FRONTEND_PROD_PATH"
+cd "$FRONTEND_DEV_PATH"
 
-echo "Resetting to latest main..."
-git fetch origin main
-git checkout main --force
-git reset --hard origin/main
+echo "Resetting to latest dev..."
+git fetch origin dev
+git checkout dev --force
+git reset --hard origin/dev
 
 echo "Installing dependencies..."
 npm ci
@@ -25,6 +25,6 @@ echo "Building..."
 npm run build
 
 echo "Copying files to webroot..."
-sudo cp -rf dist/. "$FRONTEND_DEPLOYED_PROD_PATH"
+sudo cp -rf dist/. "$FRONTEND_DEPLOYED_DEV_PATH"
 
-echo "Frontend production deployment complete"
+echo "Frontend dev deployment complete"
