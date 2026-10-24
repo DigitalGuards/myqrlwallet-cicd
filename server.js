@@ -42,7 +42,7 @@ function verifySignature(req, res, buf) {
 
   const expected = `sha256=${crypto.createHmac("sha256", SECRET).update(buf).digest("hex")}`;
 
-  // timingSafeEqual throws on length mismatch — guard against it
+  // timingSafeEqual throws on length mismatch: guard against it
   if (
     signature.length !== expected.length ||
     !crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))
@@ -53,7 +53,8 @@ function verifySignature(req, res, buf) {
 
 const signedJson = express.json({
   verify: verifySignature,
-  limit: "1mb", // Cap payload size — GitHub push payloads are typically <100KB
+  limit: "1mb", // Cap payload size: GitHub push payloads are typically <100KB
+  inflate: false, // GitHub sends plain JSON; refuse compressed bodies before any decoder exists
 });
 
 // ── Discord notifications ──────────────────────────────────────────────────
@@ -107,7 +108,7 @@ function runDeploy(script, req, res) {
 
   log("info", "deploy", `Starting ${script}`, { deliveryId, pusher, headCommit });
 
-  // execFile avoids shell — no injection surface
+  // execFile avoids shell: no injection surface
   execFile("bash", [path.join(__dirname, script)], { cwd: __dirname, timeout: 300000 }, (err, stdout, stderr) => {
     const duration = ((Date.now() - startTime) / 1000).toFixed(1);
     activeDeploys.delete(script);
