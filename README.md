@@ -109,6 +109,7 @@ The project includes four deployment scripts:
    - Pulls from main branch
    - Builds the application
    - Copies built files to production server
+   - Removes build files of earlier deploys from the webroot's `assets` folder once they are older than 30 days (`prune-webroot-assets.sh`; test with `node --test prune-webroot-assets.test.mjs`). The dev script does the same.
 
 2. `deploy-frontend-dev.sh`: Deploys frontend to development
    - Pulls from dev branch

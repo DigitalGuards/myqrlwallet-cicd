@@ -27,4 +27,8 @@ npm run build
 echo "Copying files to webroot..."
 sudo cp -rf dist/. "$FRONTEND_DEPLOYED_PROD_PATH"
 
+echo "Removing build files of deploys older than 30 days..."
+"$SCRIPT_DIR/prune-webroot-assets.sh" dist "$FRONTEND_DEPLOYED_PROD_PATH" ||
+  echo "Warning: old build files were not removed; the deploy itself is complete"
+
 echo "Frontend production deployment complete"
