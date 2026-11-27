@@ -109,6 +109,7 @@ The project includes four deployment scripts:
    - Pulls from main branch
    - Builds the application
    - Copies built files to production server
+   - Removes build files of earlier deploys from the webroot's `assets` folder (`prune-webroot-assets.sh`). Each deploy records its file list under `.webroot-builds/`; a file goes only when the new build lacks it, every build that contains it was replaced more than 30 days ago, and it was last written more than 30 days ago. The build before the current one always stays. The dev script does the same. Tests: `npm test`.
 
 2. `deploy-frontend-dev.sh`: Deploys frontend to development
    - Pulls from dev branch
